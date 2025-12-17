@@ -12,8 +12,11 @@
   "scripts": {
     "bootstrap": "./scripts/bootstrap.sh",
     "install-servers": "./scripts/install-mcp-servers.sh",
-    "test": "npm test --workspaces",
-    "test:integration": "./scripts/test-integration.sh",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:coverage": "vitest run --coverage",
     "build": "npm run build --workspaces",
     "dev": "npm run dev --workspaces --if-present",
     "lint": "eslint . --ext .ts,.tsx",
@@ -34,8 +37,10 @@
     "@types/node": "^20.10.0",
     "@typescript-eslint/eslint-plugin": "^6.15.0",
     "@typescript-eslint/parser": "^6.15.0",
+    "@vitest/coverage-v8": "^1.0.4",
     "eslint": "^8.56.0",
     "prettier": "^3.1.1",
-    "typescript": "^5.3.3"
+    "typescript": "^5.3.3",
+    "vitest": "^1.0.4"
   }
 }
