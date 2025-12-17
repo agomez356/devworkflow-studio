@@ -13,7 +13,7 @@ cd "$PROJECT_ROOT"
 echo "🛑 Stopping DevWorkflow Studio services..."
 echo ""
 
-docker-compose down
+docker compose down
 
 echo ""
 echo "✅ All services stopped."

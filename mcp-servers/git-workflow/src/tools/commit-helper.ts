@@ -90,8 +90,7 @@ function analyzeChanges(diff: string, files: string[]): {
 
 function generateDescription(
   type: string,
-  scope: string | undefined,
-  analysis: { summary: string }
+  scope: string | undefined
 ): string {
   const descriptions: Record<string, string> = {
     feat: "Add new feature",
@@ -130,7 +129,7 @@ export async function executeGenerateCommitMsg(args: Record<string, any>) {
     // Generate commit message
     const scopePart = scope ? `(${scope})` : "";
     const breakingPart = includeBreaking ? "!" : "";
-    const description = generateDescription(type, scope, analysis);
+    const description = generateDescription(type, scope);
 
     const commitMessage = `${type}${scopePart}${breakingPart}: ${description}
 

@@ -5,10 +5,6 @@
 
 import * as fs from "fs/promises";
 import * as path from "path";
-import { exec } from "child_process";
-import { promisify } from "util";
-
-const execAsync = promisify(exec);
 
 export const generateReadmeTool = {
   name: "generate_readme",
@@ -79,7 +75,7 @@ async function analyzeProjectStructure(projectPath: string): Promise<{
 
 function generateReadmeContent(
   pkg: any,
-  structure: any,
+  structure: { hasTests: boolean; hasDocs: boolean; hasDocker: boolean; mainDirs: string[] },
   sections: string[]
 ): string {
   const projectName = pkg?.name || "Project";

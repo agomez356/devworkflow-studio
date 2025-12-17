@@ -13,14 +13,14 @@ cd "$PROJECT_ROOT"
 echo "🐳 Starting DevWorkflow Studio development environment..."
 echo ""
 
-# Check if docker-compose is installed
-if ! command -v docker-compose &> /dev/null; then
-    echo "❌ docker-compose not found. Please install it first."
+# Check if docker compose is installed
+if ! command -v docker &> /dev/null; then
+    echo "❌ docker not found. Please install it first."
     exit 1
 fi
 
 # Build and start development container
-docker-compose up --build dev
+docker compose up --build dev
 
 echo ""
 echo "✅ Development environment stopped."

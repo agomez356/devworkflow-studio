@@ -4,7 +4,6 @@
  */
 
 import * as fs from "fs/promises";
-import * as path from "path";
 
 export const analyzeComplexityTool = {
   name: "analyze_complexity",

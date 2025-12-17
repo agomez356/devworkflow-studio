@@ -14,12 +14,12 @@ echo "🚀 Starting DevWorkflow Studio MCP servers..."
 echo ""
 
 # Check if services are already running
-if docker-compose ps | grep -q "Up"; then
+if docker compose ps | grep -q "Up"; then
     echo "⚠️  Some services are already running."
     read -p "Do you want to restart them? (y/n) " -n 1 -r
     echo
     if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker-compose down
+        docker compose down
     else
         echo "Cancelled."
         exit 0
@@ -27,19 +27,19 @@ if docker-compose ps | grep -q "Up"; then
 fi
 
 # Start all services
-docker-compose up -d code-quality git-workflow doc-generator
+docker compose up -d code-quality git-workflow doc-generator
 
 echo ""
 echo "✅ All services started!"
 echo ""
 echo "Running services:"
-docker-compose ps
+docker compose ps
 
 echo ""
 echo "📋 View logs:"
-echo "  docker-compose logs -f code-quality"
-echo "  docker-compose logs -f git-workflow"
-echo "  docker-compose logs -f doc-generator"
+echo "  docker compose logs -f code-quality"
+echo "  docker compose logs -f git-workflow"
+echo "  docker compose logs -f doc-generator"
 echo ""
 echo "🛑 Stop all services:"
-echo "  docker-compose down"
+echo "  docker compose down"

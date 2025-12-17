@@ -14,7 +14,7 @@ echo "🔨 Building DevWorkflow Studio Docker images..."
 echo ""
 
 # Build all services
-docker-compose build --parallel
+docker compose build --parallel
 
 echo ""
 echo "✅ All images built successfully!"

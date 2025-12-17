@@ -16,10 +16,10 @@ if [ -z "$SERVICE" ]; then
     echo "📋 Viewing logs from all services..."
     echo "Press Ctrl+C to stop"
     echo ""
-    docker-compose logs -f
+    docker compose logs -f
 else
     echo "📋 Viewing logs from $SERVICE..."
     echo "Press Ctrl+C to stop"
     echo ""
-    docker-compose logs -f "$SERVICE"
+    docker compose logs -f "$SERVICE"
 fi

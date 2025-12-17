@@ -12,17 +12,20 @@ RUN apk add --no-cache \
 # Set working directory
 WORKDIR /app
 
-# Copy package files
+# Copy package files (root and all servers for workspace resolution)
 COPY package*.json ./
 COPY tsconfig.json ./
+COPY mcp-servers/code-quality/package.json ./mcp-servers/code-quality/
+COPY mcp-servers/git-workflow/package.json ./mcp-servers/git-workflow/
+COPY mcp-servers/doc-generator/package.json ./mcp-servers/doc-generator/
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (workspace-aware)
+RUN npm install
 
 # Copy shared modules
 COPY mcp-servers/shared ./mcp-servers/shared
 
-# Copy all MCP servers
+# Copy all MCP servers source code
 COPY mcp-servers/code-quality ./mcp-servers/code-quality
 COPY mcp-servers/git-workflow ./mcp-servers/git-workflow
 COPY mcp-servers/doc-generator ./mcp-servers/doc-generator
@@ -42,7 +45,7 @@ RUN apk add --no-cache git
 
 # Copy only production dependencies
 COPY --from=base /app/package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 # Copy built code-quality server
 COPY --from=builder /app/mcp-servers/code-quality/dist ./mcp-servers/code-quality/dist
@@ -61,7 +64,7 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY --from=base /app/package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 COPY --from=builder /app/mcp-servers/git-workflow/dist ./mcp-servers/git-workflow/dist
 COPY --from=builder /app/mcp-servers/git-workflow/package.json ./mcp-servers/git-workflow/
@@ -79,7 +82,7 @@ WORKDIR /app
 RUN apk add --no-cache git
 
 COPY --from=base /app/package*.json ./
-RUN npm ci --only=production
+RUN npm install --only=production
 
 COPY --from=builder /app/mcp-servers/doc-generator/dist ./mcp-servers/doc-generator/dist
 COPY --from=builder /app/mcp-servers/doc-generator/package.json ./mcp-servers/doc-generator/

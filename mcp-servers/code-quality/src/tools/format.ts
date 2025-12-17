@@ -50,7 +50,7 @@ async function detectFormatter(filePath: string): Promise<string> {
 async function runPrettier(targetPath: string, write: boolean): Promise<string> {
   try {
     const writeFlag = write ? "--write" : "--check";
-    const { stdout, stderr } = await execAsync(`npx prettier ${writeFlag} "${targetPath}"`);
+    const { stdout } = await execAsync(`npx prettier ${writeFlag} "${targetPath}"`);
 
     if (write) {
       return JSON.stringify(
