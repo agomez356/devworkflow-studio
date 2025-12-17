@@ -1,0 +1,222 @@
+# DevWorkflow Studio - Goose Hints
+
+This project demonstrates MCP (Model Context Protocol) + Goose + AGENTS.md integration for development workflow automation.
+
+## Project Architecture
+
+**Three MCP Servers**:
+- `code-quality` - Linting, formatting, complexity analysis
+- `git-workflow` - Branch management, commits, PR analysis
+- `doc-generator` - README, API docs, CHANGELOG generation
+
+**Tech Stack**: TypeScript, Node.js 18+, MCP SDK, Docker
+
+## Key Directories
+
+```
+mcp-servers/          # MCP server implementations
+  shared/             # Shared utilities (types, error-handling, base class)
+  code-quality/       # Code analysis MCP server
+  git-workflow/       # Git operations MCP server
+  doc-generator/      # Documentation MCP server
+goose-recipes/        # Automation recipes
+docs/                 # Learning documentation
+examples/             # Example projects with AGENTS.md
+templates/            # Starter templates
+scripts/              # Helper scripts (Docker, bootstrap)
+```
+
+## Development Commands
+
+```bash
+# Docker (Recommended)
+./scripts/docker-build.sh       # Build all images
+./scripts/docker-start.sh       # Start all services
+./scripts/docker-dev.sh         # Development mode with hot reload
+./scripts/docker-logs.sh        # View logs
+
+# Native Node.js
+npm install                     # Install dependencies
+npm run build                   # Build all servers
+npm run build --workspace=@devworkflow/code-quality  # Build specific server
+npm test                        # Run tests
+npm run lint                    # Lint code
+
+# MCP Server Testing
+node mcp-servers/code-quality/dist/index.js    # Run server standalone
+node mcp-servers/git-workflow/dist/index.js
+node mcp-servers/doc-generator/dist/index.js
+```
+
+## MCP Server Details
+
+### Code Quality Server
+
+**Tools**:
+- `lint_code(path, linter, fix)` - Run ESLint/Pylint
+- `format_code(path, formatter, write)` - Format with Prettier/Black
+- `analyze_complexity(path)` - Calculate cyclomatic complexity
+
+**Resources**:
+- `code://metrics` - Current project metrics
+
+### Git Workflow Server
+
+**Tools**:
+- `create_branch(name, type, from, checkout)` - Create feature/bugfix/hotfix branches
+- `generate_commit_msg(type, scope, includeBreaking)` - Semantic commit messages
+- `analyze_pr(prNumber, baseBranch, checkConventions)` - PR analysis and recommendations
+
+**Prompts**:
+- `pr-review-template` - Structured PR review checklist
+
+### Doc Generator Server
+
+**Tools**:
+- `generate_readme(projectPath, sections, overwrite)` - Generate README.md
+- `generate_api_docs(inputPath, outputPath, format)` - API documentation
+- `update_changelog(version, fromTag, unreleased)` - CHANGELOG updates
+
+**Resources**:
+- `docs://project-info` - Project metadata and statistics
+
+## Goose Recipes
+
+Recipes are in `goose-recipes/` directory:
+
+- `code-review.yaml` - Comprehensive code review using multiple MCP servers
+- `setup-feature.yaml` - Scaffold new feature with structure and docs
+- `pre-commit-check.yaml` - Quality gates before commits
+- `update-docs.yaml` - Sync documentation with code
+
+Example usage:
+```bash
+goose run code-review
+goose run setup-feature --feature_name auth
+```
+
+## Common Workflows
+
+### Code Review Workflow
+1. Make code changes
+2. Stage changes: `git add .`
+3. Run: `goose run code-review`
+4. Review generated report
+5. Fix issues and re-run
+
+### New Feature Setup
+1. Run: `goose run setup-feature --feature_name <name>`
+2. Goose creates directory structure
+3. Generates boilerplate code
+4. Updates documentation
+5. Creates feature branch
+
+### Pre-Commit Workflow
+1. Stage changes: `git add .`
+2. Run: `goose run pre-commit-check`
+3. If pass: commit changes
+4. If fail: fix issues and re-run
+
+## Testing MCP Tools
+
+### Test Code Quality Tools
+```bash
+# Lint a file
+echo '{"path": "./src/index.ts", "linter": "eslint"}' | node mcp-servers/code-quality/dist/index.js
+
+# Format code
+echo '{"path": "./src", "formatter": "prettier", "write": false}' | node mcp-servers/code-quality/dist/index.js
+
+# Analyze complexity
+echo '{"path": "./src/index.ts"}' | node mcp-servers/code-quality/dist/index.js
+```
+
+### Test Git Workflow Tools
+```bash
+# Create branch
+echo '{"name": "user-auth", "type": "feature"}' | node mcp-servers/git-workflow/dist/index.js
+
+# Generate commit message
+echo '{"type": "feat", "scope": "auth"}' | node mcp-servers/git-workflow/dist/index.js
+
+# Analyze PR
+echo '{"baseBranch": "main", "checkConventions": true}' | node mcp-servers/git-workflow/dist/index.js
+```
+
+## Code Patterns
+
+### MCP Server Pattern
+All servers extend `MCPServerBase` from `mcp-servers/shared/mcp-base.ts`:
+```typescript
+class MyServer extends MCPServerBase {
+  protected initialize() {
+    this.registerTool(myTool);
+    this.registerResource(myResource);
+    this.registerPrompt(myPrompt);
+  }
+
+  protected async executeTool(name: string, params: any) {
+    // Tool execution logic
+  }
+}
+```
+
+### Error Handling Pattern
+Use utilities from `mcp-servers/shared/error-handling.ts`:
+```typescript
+import { safeExecute, validateRequired, successResult, errorResult } from '../shared/error-handling.js';
+
+export async function executeTool(args: Record<string, any>) {
+  validateRequired(args, ['requiredParam']);
+
+  return await safeExecute(async () => {
+    // Tool logic here
+    return successResult("Success!");
+  }, "Tool context");
+}
+```
+
+## Important Files
+
+- `mcp-servers/shared/mcp-base.ts` - Base class for all servers
+- `mcp-servers/shared/error-handling.ts` - Error handling utilities
+- `mcp-servers/shared/types.ts` - TypeScript type definitions
+- `goose.yaml` - Goose configuration with MCP server connections
+- `AGENTS.md` - Comprehensive documentation for AI agents
+- `docker-compose.yml` - Multi-service Docker setup
+- `Dockerfile` - Multi-stage build configuration
+
+## Project Status
+
+✅ **Phase 1 Complete**: Foundation & Docker
+✅ **Phase 2 Complete**: All MCP servers & Goose integration
+🚧 **Phase 3**: Examples & comprehensive testing
+🚧 **Phase 4**: Polish & complete documentation
+
+## Next Steps
+
+When implementing new features:
+1. Add tests for new functionality
+2. Update relevant MCP server tools
+3. Create or update Goose recipes
+4. Update AGENTS.md with new context
+5. Update Docker configuration if needed
+
+## Security Notes
+
+- All MCP servers validate inputs
+- File paths are sanitized to prevent traversal
+- Git operations use safe command execution
+- No secrets in code - use environment variables
+
+## Learning Resources
+
+See `docs/` for detailed guides:
+- `01-getting-started.md` - Quick start
+- `docker-guide.md` - Docker usage
+- `02-mcp-basics.md` - Understanding MCP
+- `03-goose-recipes.md` - Writing recipes
+- `04-agents-md-guide.md` - AGENTS.md best practices
+- `05-integration-patterns.md` - MCP + Goose patterns
+
+This project is educational - adapt patterns for production use.

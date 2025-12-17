@@ -1,0 +1,306 @@
+# Code Review Recipe
+# Comprehensive code review workflow using multiple MCP servers
+# Demonstrates integration of code-quality, git-workflow, and doc-generator servers
+
+name: code-review
+description: "Comprehensive automated code review analyzing code quality, Git history, and documentation coverage"
+version: 1.0.0
+author: DevWorkflow Studio
+tags: [code-quality, git, review, automation]
+
+# Input parameters
+parameters:
+  base_branch:
+    type: string
+    description: "Base branch to compare against"
+    default: "main"
+
+  check_docs:
+    type: boolean
+    description: "Check documentation coverage"
+    default: true
+
+  generate_report:
+    type: boolean
+    description: "Generate markdown report file"
+    default: true
+
+# Recipe steps
+steps:
+  # Step 1: Gather Git context
+  - name: analyze_pr
+    description: "Analyze PR/branch changes using git-workflow server"
+    server: git-workflow
+    tool: analyze_pr
+    arguments:
+      baseBranch: "{{parameters.base_branch}}"
+      checkConventions: true
+    capture_output: pr_analysis
+    on_error: continue
+
+  # Step 2: Get changed files for targeted analysis
+  - name: get_changed_files
+    description: "Get list of modified files"
+    command: git diff --name-only {{parameters.base_branch}}...HEAD
+    capture_output: changed_files
+    on_error: abort
+
+  # Step 3: Lint all changed files
+  - name: lint_changes
+    description: "Run linter on all changed files using code-quality server"
+    server: code-quality
+    tool: lint_code
+    arguments:
+      path: "{{step.get_changed_files.output}}"
+      linter: "auto"
+      fix: false
+    capture_output: lint_results
+    on_error: continue
+
+  # Step 4: Analyze code complexity
+  - name: analyze_complexity
+    description: "Analyze complexity of changed source files"
+    server: code-quality
+    tool: analyze_complexity
+    for_each: "{{step.changed_files.output | filter_source_files}}"
+    arguments:
+      path: "{{item}}"
+    capture_output: complexity_results
+    on_error: continue
+
+  # Step 5: Check code formatting
+  - name: check_formatting
+    description: "Check if code follows formatting standards"
+    server: code-quality
+    tool: format_code
+    arguments:
+      path: "."
+      formatter: "auto"
+      write: false
+    capture_output: format_results
+    on_error: continue
+
+  # Step 6: Check documentation coverage (conditional)
+  - name: check_docs
+    description: "Analyze documentation coverage"
+    condition: "{{parameters.check_docs}}"
+    server: doc-generator
+    tool: generate_api_docs
+    arguments:
+      inputPath: "./src"
+      outputPath: "/tmp/doc-analysis"
+      format: "json"
+    capture_output: doc_coverage
+    on_error: continue
+
+  # Step 7: Get project info for context
+  - name: get_project_info
+    description: "Get project metadata and statistics"
+    server: doc-generator
+    resource: docs://project-info
+    capture_output: project_info
+    on_error: continue
+
+  # Step 8: Analyze and synthesize results
+  - name: synthesize_review
+    description: "Synthesize all results into comprehensive review"
+    prompt: |
+      You are conducting a comprehensive code review. Analyze the following data:
+
+      ## PR Analysis
+      {{step.analyze_pr.output}}
+
+      ## Lint Results
+      {{step.lint_changes.output}}
+
+      ## Complexity Analysis
+      {{step.analyze_complexity.output}}
+
+      ## Formatting Check
+      {{step.check_formatting.output}}
+
+      {% if parameters.check_docs %}
+      ## Documentation Coverage
+      {{step.check_docs.output}}
+      {% endif %}
+
+      ## Project Context
+      {{step.get_project_info.output}}
+
+      Please provide:
+      1. **Executive Summary** - Overall assessment (Approve/Request Changes/Comment)
+      2. **Critical Issues** - Issues that must be fixed (if any)
+      3. **Major Issues** - Important but not blocking (if any)
+      4. **Minor Issues & Suggestions** - Nice-to-have improvements
+      5. **Positive Aspects** - What was done well
+      6. **Recommendations** - Specific actionable items
+      7. **Metrics Summary** - Key statistics and trends
+
+      Be specific, constructive, and reference file names and line numbers when possible.
+    capture_output: review_synthesis
+    on_error: continue
+
+  # Step 9: Generate report file (conditional)
+  - name: generate_report_file
+    description: "Generate markdown report file"
+    condition: "{{parameters.generate_report}}"
+    command: |
+      cat > code-review-report.md << 'EOF'
+      # Code Review Report
+
+      **Generated**: {{current_timestamp}}
+      **Base Branch**: {{parameters.base_branch}}
+      **Reviewer**: Goose (automated)
+
+      ---
+
+      {{step.synthesize_review.output}}
+
+      ---
+
+      ## Raw Data
+
+      ### PR Analysis
+      ```json
+      {{step.analyze_pr.output | pretty_json}}
+      ```
+
+      ### Lint Summary
+      ```json
+      {{step.lint_changes.output | pretty_json}}
+      ```
+
+      ### Complexity Summary
+      ```json
+      {{step.analyze_complexity.output | pretty_json}}
+      ```
+
+      ### Format Check
+      ```json
+      {{step.check_formatting.output | pretty_json}}
+      ```
+
+      {% if parameters.check_docs %}
+      ### Documentation Coverage
+      ```json
+      {{step.check_docs.output | pretty_json}}
+      ```
+      {% endif %}
+
+      ---
+
+      *Report generated by DevWorkflow Studio*
+      EOF
+    on_error: continue
+
+# Outputs
+outputs:
+  - name: review_summary
+    value: "{{step.synthesize_review.output}}"
+
+  - name: report_file
+    value: "code-review-report.md"
+    condition: "{{parameters.generate_report}}"
+
+  - name: issues_found
+    value: "{{step.lint_changes.output.summary.total}}"
+
+  - name: high_complexity_files
+    value: "{{step.analyze_complexity.output | filter: rating == 'High' or rating == 'Very High'}}"
+
+  - name: approval_recommendation
+    value: "{{step.synthesize_review.output | extract_approval_status}}"
+
+# Post-execution actions
+post_actions:
+  - name: display_summary
+    action: print
+    message: |
+      📋 Code Review Complete!
+
+      ✅ Steps Completed: {{steps_completed}}/{{total_steps}}
+      📊 Files Analyzed: {{step.pr_analysis.output.stats.filesChanged}}
+      🐛 Issues Found: {{outputs.issues_found}}
+      📈 Recommendation: {{outputs.approval_recommendation}}
+
+      {% if parameters.generate_report %}
+      📄 Report saved to: {{outputs.report_file}}
+      {% endif %}
+
+      Run `cat code-review-report.md` to view full report.
+
+  - name: suggest_next_steps
+    action: suggest
+    suggestions:
+      - condition: "{{outputs.issues_found > 0}}"
+        message: "Fix linting issues: goose run fix-lint-issues"
+
+      - condition: "{{outputs.high_complexity_files | length > 0}}"
+        message: "Refactor complex files: goose run refactor-complex-code"
+
+      - condition: "{{outputs.approval_recommendation == 'Request Changes'}}"
+        message: "Address critical issues before merging"
+
+      - condition: "{{outputs.approval_recommendation == 'Approve'}}"
+        message: "Ready to merge! Run: git push"
+
+# Error handling
+error_handling:
+  strategy: continue        # continue, abort, retry
+  max_retries: 2
+  retry_delay: 5            # seconds
+  on_final_failure: report  # report, abort, ignore
+
+# Performance settings
+performance:
+  parallel: true            # Run independent steps in parallel
+  max_parallel: 3
+  timeout: 600              # 10 minutes total
+  cache_results: true
+
+# Validation
+validation:
+  pre_run:
+    - check: git_repository_exists
+      message: "Must be run in a git repository"
+
+    - check: has_staged_or_committed_changes
+      message: "No changes to review"
+
+    - check: mcp_servers_available
+      servers: [code-quality, git-workflow, doc-generator]
+      message: "Required MCP servers not available"
+
+  post_run:
+    - check: outputs_generated
+      outputs: [review_summary]
+      message: "Review synthesis failed"
+
+# Metadata
+metadata:
+  category: code-review
+  difficulty: intermediate
+  estimated_time: "5-10 minutes"
+  requires:
+    - git repository
+    - MCP servers built
+    - Changes to review
+
+  tags:
+    - automated-review
+    - quality-check
+    - pre-merge
+    - ci-cd
+
+  examples:
+    - description: "Review current branch against main"
+      command: "goose run code-review"
+
+    - description: "Review against develop branch"
+      command: "goose run code-review --base_branch=develop"
+
+    - description: "Quick review without documentation check"
+      command: "goose run code-review --check_docs=false"
+
+    - description: "Review without generating report file"
+      command: "goose run code-review --generate_report=false"

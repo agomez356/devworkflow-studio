@@ -1,0 +1,235 @@
+# Goose Configuration for DevWorkflow Studio
+# Connects Goose to MCP servers for workflow automation
+
+name: devworkflow-studio
+version: 1.0.0
+description: Development workflow automation with MCP + Goose
+
+# MCP Server Connections
+mcp_servers:
+  code-quality:
+    description: "Code analysis, linting, formatting, and complexity metrics"
+    command: node
+    args:
+      - ./mcp-servers/code-quality/dist/index.js
+    env:
+      NODE_ENV: production
+      LOG_LEVEL: info
+
+  git-workflow:
+    description: "Git operations, branch management, and PR workflows"
+    command: node
+    args:
+      - ./mcp-servers/git-workflow/dist/index.js
+    env:
+      NODE_ENV: production
+      LOG_LEVEL: info
+
+  doc-generator:
+    description: "Documentation generation and maintenance"
+    command: node
+    args:
+      - ./mcp-servers/doc-generator/dist/index.js
+    env:
+      NODE_ENV: production
+      LOG_LEVEL: info
+
+# Goose Extensions
+extensions:
+  - code-execution    # Execute code snippets
+  - chat-recall       # Recall previous conversations
+  - skills            # Custom skills
+  - todo              # Task tracking
+
+# Permissions
+permissions:
+  filesystem:
+    # Read permissions
+    read:
+      - "**/*"                    # All files for analysis
+      - ".git/**"                 # Git repository
+      - "node_modules/**"         # Dependencies (for analysis)
+
+    # Write permissions (more restricted)
+    write:
+      - "docs/**"                 # Documentation
+      - "examples/**"             # Examples
+      - "goose-recipes/**"        # Recipes
+      - "*.md"                    # Markdown files
+      - "CHANGELOG.md"            # Changelog
+      - "README.md"               # README
+      - "mcp-servers/**/src/**"   # Source code (for fixes)
+      - "mcp-servers/**/tests/**" # Tests
+
+    # Denied paths
+    deny:
+      - ".env"                    # Environment variables
+      - ".env.*"                  # Environment variants
+      - "**/.git/config"          # Git config
+      - "**/node_modules/**"      # Don't write to dependencies
+      - "**/dist/**"              # Don't write to build output
+
+  network:
+    # Allowed domains for external requests
+    allowed_domains:
+      - "api.github.com"          # GitHub API
+      - "registry.npmjs.org"      # npm registry
+      - "raw.githubusercontent.com" # GitHub raw content
+
+    # Blocked domains
+    blocked_domains: []
+
+  execution:
+    # Allowed commands
+    allowed_commands:
+      - "git"                     # Git operations
+      - "node"                    # Node.js execution
+      - "npm"                     # npm commands
+      - "npx"                     # npx commands
+      - "eslint"                  # Linting
+      - "prettier"                # Formatting
+      - "tsc"                     # TypeScript compiler
+      - "docker"                  # Docker commands
+      - "docker-compose"          # Docker Compose
+
+    # Command restrictions
+    restrictions:
+      git:
+        allow: ["status", "diff", "log", "branch", "add", "commit", "checkout"]
+        deny: ["push", "force", "reset --hard", "clean -fd"]
+
+      npm:
+        allow: ["install", "test", "run", "build"]
+        deny: ["publish", "unpublish"]
+
+      docker:
+        allow: ["build", "run", "ps", "logs", "compose"]
+        deny: ["rm -f", "system prune -a"]
+
+# Default Model Configuration
+model:
+  provider: anthropic          # or openai, google, etc.
+  name: claude-sonnet-4.5      # Default model
+  temperature: 0.7
+  max_tokens: 4096
+
+  # Model selection per task type (optional)
+  task_models:
+    code_review: claude-sonnet-4.5
+    documentation: claude-sonnet-4.5
+    simple_tasks: claude-haiku-3.5
+
+# Session Configuration
+session:
+  max_turns: 1000              # Maximum conversation turns
+  context_window: 200000        # Context window size
+  auto_save: true              # Auto-save sessions
+  save_interval: 300           # Save every 5 minutes
+
+# Recipe Configuration
+recipes:
+  directory: ./goose-recipes
+  auto_discover: true
+  validation: strict
+
+  # Recipe defaults
+  defaults:
+    timeout: 600               # 10 minutes
+    retries: 3
+    on_error: continue         # continue, abort, retry
+
+# Logging
+logging:
+  level: info                  # debug, info, warn, error
+  file: ./logs/goose.log
+  max_size: 10485760          # 10MB
+  max_files: 5
+  console: true
+
+# Hooks (optional)
+hooks:
+  pre_recipe:
+    - command: npm run lint
+      on_error: warn
+
+  post_recipe:
+    - command: git status
+      on_error: continue
+
+  pre_tool:
+    - validate_inputs
+
+  post_tool:
+    - log_execution
+
+# Cache Configuration
+cache:
+  enabled: true
+  directory: ./.goose/cache
+  ttl: 3600                   # 1 hour
+  max_size: 104857600         # 100MB
+
+# Performance
+performance:
+  parallel_tools: 3           # Max parallel tool executions
+  batch_size: 10              # Batch size for operations
+  timeout: 300                # Default timeout (seconds)
+
+# Feature Flags
+features:
+  experimental_tools: false
+  beta_recipes: false
+  advanced_prompts: true
+  tool_chaining: true
+  multi_server: true
+
+# Metadata
+metadata:
+  project: DevWorkflow Studio
+  repository: https://github.com/agomez356/devworkflow-studio
+  documentation: ./docs
+  issues: https://github.com/agomez356/devworkflow-studio/issues
+
+# Environment-specific overrides
+# Override settings based on environment
+environments:
+  development:
+    logging:
+      level: debug
+    permissions:
+      filesystem:
+        write:
+          - "**/*"            # More permissive in dev
+
+  production:
+    logging:
+      level: warn
+    permissions:
+      filesystem:
+        write:
+          - "docs/**"
+          - "*.md"            # Restricted in production
+
+  testing:
+    session:
+      auto_save: false
+    cache:
+      enabled: false
+
+# Custom configuration
+custom:
+  project_conventions:
+    commit_format: conventional
+    branch_naming: type/description
+    pr_template: .github/PULL_REQUEST_TEMPLATE.md
+
+  quality_standards:
+    min_coverage: 80
+    max_complexity: 20
+    linting: strict
+    formatting: required
+
+  automation:
+    auto_format_on_save: true
+    auto_lint_on_commit: true
+    auto_test_on_push: true
