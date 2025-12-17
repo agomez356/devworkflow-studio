@@ -1,0 +1,92 @@
+version: '3.8'
+
+services:
+  # Code Quality MCP Server
+  code-quality:
+    build:
+      context: .
+      target: code-quality
+      dockerfile: Dockerfile
+    container_name: devworkflow-code-quality
+    volumes:
+      - ./:/workspace:ro  # Mount workspace as read-only for analysis
+      - code-quality-cache:/root/.cache
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+
+  # Git Workflow MCP Server
+  git-workflow:
+    build:
+      context: .
+      target: git-workflow
+      dockerfile: Dockerfile
+    container_name: devworkflow-git-workflow
+    volumes:
+      - ./:/workspace  # Needs write access for git operations
+      - git-config:/root/.gitconfig:ro
+      - ssh-keys:/root/.ssh:ro
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+
+  # Doc Generator MCP Server
+  doc-generator:
+    build:
+      context: .
+      target: doc-generator
+      dockerfile: Dockerfile
+    container_name: devworkflow-doc-generator
+    volumes:
+      - ./:/workspace  # Needs write access for documentation generation
+      - doc-generator-cache:/root/.cache
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+
+  # Development environment (all servers in watch mode)
+  dev:
+    build:
+      context: .
+      target: development
+      dockerfile: Dockerfile
+    container_name: devworkflow-dev
+    volumes:
+      - ./:/app
+      - /app/node_modules
+      - /app/mcp-servers/code-quality/node_modules
+      - /app/mcp-servers/git-workflow/node_modules
+      - /app/mcp-servers/doc-generator/node_modules
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"  # code-quality dev port
+      - "3001:3001"  # git-workflow dev port
+      - "3002:3002"  # doc-generator dev port
+    stdin_open: true
+    tty: true
+    networks:
+      - mcp-network
+    command: npm run dev
+
+networks:
+  mcp-network:
+    driver: bridge
+
+volumes:
+  code-quality-cache:
+  doc-generator-cache:
+  git-config:
+  ssh-keys:

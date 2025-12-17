@@ -38,15 +38,32 @@ DevWorkflow Studio is a comprehensive learning project that demonstrates how to:
 
 ## Quick Start
 
+### Option 1: Docker (Recommended)
+
 ```bash
 # Clone the repository
-git clone https://github.com/YOUR_USERNAME/devworkflow-studio.git
+git clone https://github.com/agomez356/devworkflow-studio.git
 cd devworkflow-studio
 
-# Run bootstrap script
-./scripts/bootstrap.sh
+# Start all MCP servers with Docker
+./scripts/docker-build.sh
+./scripts/docker-start.sh
 
-# Or install manually
+# View logs
+./scripts/docker-logs.sh
+
+# For development with hot reload
+./scripts/docker-dev.sh
+```
+
+### Option 2: Native Node.js
+
+```bash
+# Clone the repository
+git clone https://github.com/agomez356/devworkflow-studio.git
+cd devworkflow-studio
+
+# Install dependencies
 npm install
 
 # Build all MCP servers
@@ -59,6 +76,7 @@ npm test
 ## Documentation
 
 - [Getting Started](docs/01-getting-started.md)
+- [Docker Guide](docs/docker-guide.md) - **Docker setup and usage**
 - [MCP Basics](docs/02-mcp-basics.md)
 - [Goose Recipes](docs/03-goose-recipes.md)
 - [AGENTS.md Guide](docs/04-agents-md-guide.md)
