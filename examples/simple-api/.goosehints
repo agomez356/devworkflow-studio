@@ -1,0 +1,127 @@
+# Simple API - Goose Context
+
+## Project Overview
+A minimal REST API example demonstrating DevWorkflow Studio MCP server integration.
+Built with Express and TypeScript to showcase how MCP tools can enhance development workflows.
+
+## Architecture
+- **Framework**: Express.js 4.x
+- **Language**: TypeScript 5.x
+- **Runtime**: Node.js 18+
+- **Pattern**: MVC (Model-View-Controller)
+- **Data**: In-memory storage (educational purposes)
+
+## Directory Structure
+```
+src/
+├── index.ts              # Application entry point
+├── routes/               # Route definitions
+│   └── users.ts          # User routes
+├── controllers/          # Business logic
+│   └── userController.ts # User CRUD operations
+├── models/               # Data models
+│   └── User.ts           # User interface/types
+└── middleware/           # Express middleware
+    ├── errorHandler.ts   # Global error handler
+    └── logger.ts         # Request logger
+```
+
+## Key Files
+- `src/index.ts`: Express app setup, middleware, routes
+- `src/controllers/userController.ts`: CRUD operations for users
+- `src/routes/users.ts`: RESTful route definitions
+- `Dockerfile`: Multi-stage build (dev + production)
+- `docker-compose.yml`: Container orchestration
+
+## Available Endpoints
+- `GET /health` - Health check
+- `GET /api/users` - Get all users
+- `GET /api/users/:id` - Get user by ID
+- `POST /api/users` - Create user
+- `PUT /api/users/:id` - Update user
+- `DELETE /api/users/:id` - Delete user
+
+## Development Commands
+```bash
+# Local development
+npm install
+npm run dev          # Start with hot reload
+npm run build        # Compile TypeScript
+npm run lint         # Run ESLint
+npm run format       # Format with Prettier
+
+# Docker development
+docker compose up           # Start dev server
+docker compose down         # Stop containers
+docker compose logs -f api  # View logs
+```
+
+## MCP Integration Examples
+
+This project demonstrates using DevWorkflow Studio MCP servers:
+
+### Code Quality Server
+```bash
+# Lint TypeScript code
+Use: lint_code tool with path="src"
+
+# Format all code
+Use: format_code tool with path="src" and write=true
+
+# Analyze complexity
+Use: analyze_complexity tool with path="src/controllers/userController.ts"
+```
+
+### Git Workflow Server
+```bash
+# Create feature branch
+Use: create_branch tool with type="feature" and name="add-pagination"
+
+# Generate commit message
+Use: generate_commit_msg tool with type="feat" and scope="api"
+```
+
+### Doc Generator Server
+```bash
+# Generate/update README
+Use: generate_readme tool
+
+# Generate API docs
+Use: generate_api_docs tool with path="src" and format="markdown"
+```
+
+## Common Workflows
+
+### Adding a New Endpoint
+1. Define route in `src/routes/`
+2. Create controller method
+3. Add model types if needed
+4. Test with curl/Postman
+5. Use `lint_code` tool to check quality
+6. Use `generate_commit_msg` for semantic commit
+
+### Code Review Checklist
+- [ ] TypeScript types defined
+- [ ] Error handling in place
+- [ ] Request validation
+- [ ] Consistent naming
+- [ ] No console.log in production code
+- [ ] Linter passes (use `lint_code` tool)
+
+## Testing
+```bash
+curl http://localhost:3000/health
+curl http://localhost:3000/api/users
+curl -X POST http://localhost:3000/api/users \
+  -H "Content-Type: application/json" \
+  -d '{"name":"John Doe","email":"john@example.com"}'
+```
+
+## Notes for AI Agents
+- This is an educational example, not production-ready
+- In-memory storage means data is lost on restart
+- Replace with database (PostgreSQL/MongoDB) for real apps
+- Add authentication/authorization for production
+- Implement input validation (e.g., Joi, Zod)
+- Add rate limiting, CORS configuration
+- Use environment variables for configuration

@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  webapp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: development
+    container_name: webapp-dev
+    ports:
+      - "5173:5173"
+    volumes:
+      - ./src:/app/src
+      - ./index.html:/app/index.html
+      - ./vite.config.ts:/app/vite.config.ts
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+    restart: unless-stopped
+    networks:
+      - webapp-network
+
+  webapp-prod:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+    container_name: webapp-prod
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    networks:
+      - webapp-network
+    profiles:
+      - production
+
+networks:
+  webapp-network:
+    driver: bridge

@@ -1,0 +1,38 @@
+# WebApp - Goose Context
+
+## Project Overview
+React + TypeScript webapp example for DevWorkflow Studio MCP integration.
+User management interface with Vite bundler.
+
+## Tech Stack
+- React 18.2 + TypeScript 5.3
+- Vite 5.0 (dev server + bundler)
+- CSS modules for styling
+
+## Structure
+src/
+├── App.tsx - Main component
+├── components/ - React components
+│   ├── UserList.tsx
+│   └── AddUserForm.tsx
+├── types/ - TypeScript types
+├── styles/ - CSS files
+└── main.tsx - Entry point
+
+## Development
+npm run dev - Start Vite dev server (port 5173)
+npm run build - Build for production
+docker compose up - Start in Docker
+
+## MCP Integration Examples
+# Lint React code
+Use: lint_code tool with path="src"
+
+# Format code
+Use: format_code tool with path="src" and write=true
+
+# Create feature branch
+Use: create_branch tool with type="feature" and name="add-user-search"
+
+# Generate docs
+Use: generate_readme tool
