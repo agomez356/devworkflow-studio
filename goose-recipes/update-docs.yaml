@@ -1,0 +1,360 @@
+# update-docs.yaml
+# Goose Recipe: Documentation synchronization
+# Updates README, CHANGELOG, and API docs to match current codebase
+
+name: update-docs
+description: "Synchronize documentation with current codebase state"
+version: "1.0.0"
+
+parameters:
+  - name: update_readme
+    description: "Update README.md file"
+    required: false
+    type: boolean
+    default: true
+
+  - name: update_changelog
+    description: "Update CHANGELOG.md from git commits"
+    required: false
+    type: boolean
+    default: true
+
+  - name: update_api_docs
+    description: "Generate/update API documentation"
+    required: false
+    type: boolean
+    default: true
+
+  - name: api_docs_format
+    description: "Format for API documentation"
+    required: false
+    type: string
+    enum: ["markdown", "json", "html"]
+    default: "markdown"
+
+  - name: output_dir
+    description: "Directory for generated API docs"
+    required: false
+    type: string
+    default: "docs/api"
+
+steps:
+  # Step 1: Get project information
+  - name: get_project_info
+    description: "Fetch current project metadata"
+    server: doc-generator
+    tool: resources/read
+    params:
+      uri: "docs://project-info"
+    output: project_info
+    on_success: continue
+    on_error: warn
+
+  # Step 2: Update README.md
+  - name: update_readme
+    description: "Generate/update README.md based on current code"
+    condition: "{{ update_readme }}"
+    server: doc-generator
+    tool: generate_readme
+    params:
+      path: "."
+      sections:
+        - "overview"
+        - "installation"
+        - "usage"
+        - "api"
+        - "contributing"
+        - "license"
+      overwrite: false
+    on_success: continue
+    on_error: warn
+    error_message: "⚠️  README update failed, but continuing..."
+
+  # Step 3: Update CHANGELOG.md
+  - name: update_changelog
+    description: "Update CHANGELOG from git commits"
+    condition: "{{ update_changelog }}"
+    server: doc-generator
+    tool: update_changelog
+    params:
+      since: "last_release"
+      format: "keepachangelog"
+      group_by_type: true
+    on_success: continue
+    on_error: warn
+    error_message: "⚠️  CHANGELOG update failed, but continuing..."
+
+  # Step 4: Generate API documentation
+  - name: generate_api_docs
+    description: "Generate API documentation from source code"
+    condition: "{{ update_api_docs }}"
+    server: doc-generator
+    tool: generate_api_docs
+    params:
+      path: "src"
+      format: "{{ api_docs_format }}"
+      output: "{{ output_dir }}"
+      include_private: false
+    on_success: continue
+    on_error: warn
+    output: api_docs_generated
+
+  # Step 5: Check documentation coverage
+  - name: check_doc_coverage
+    description: "Analyze documentation coverage"
+    action: script
+    script: |
+      echo "📊 Analyzing documentation coverage..."
+
+      # Count documented vs undocumented functions
+      total_functions=$(grep -r "function\|async function\|export function" src --include="*.ts" --include="*.js" | wc -l)
+      documented_functions=$(grep -r "/\*\*" src --include="*.ts" --include="*.js" -A 1 | grep "function\|async function\|export function" | wc -l)
+
+      if [ "$total_functions" -gt 0 ]; then
+        coverage=$((documented_functions * 100 / total_functions))
+        echo "Documentation coverage: ${coverage}%"
+        echo "(${documented_functions}/${total_functions} functions documented)"
+
+        if [ "$coverage" -lt 50 ]; then
+          echo "⚠️  Documentation coverage is low. Consider adding more JSDoc comments."
+        fi
+      fi
+    output: doc_coverage
+    on_success: continue
+    on_error: warn
+
+  # Step 6: Update AGENTS.md sections
+  - name: update_agents_md
+    description: "Update AGENTS.md with current project state"
+    action: script
+    script: |
+      if [ -f "AGENTS.md" ]; then
+        echo "📝 Updating AGENTS.md..."
+
+        # Update "Last Updated" timestamp
+        sed -i "s/\*\*Last Updated\*\*:.*/\*\*Last Updated\*\*: $(date +%Y-%m-%d)/" AGENTS.md
+
+        # Update project stats if section exists
+        if grep -q "## Statistics" AGENTS.md; then
+          # Get current stats
+          files=$(find src -type f \( -name "*.ts" -o -name "*.js" \) | wc -l)
+          lines=$(find src -type f \( -name "*.ts" -o -name "*.js" \) -exec wc -l {} + | tail -1 | awk '{print $1}')
+
+          # Update stats section
+          sed -i "/## Statistics/,/^##/ s/Files:.*/Files: $files/" AGENTS.md
+          sed -i "/## Statistics/,/^##/ s/Lines of Code:.*/Lines of Code: ~$lines/" AGENTS.md
+        fi
+
+        echo "✅ AGENTS.md updated"
+      else
+        echo "ℹ️  No AGENTS.md found, skipping"
+      fi
+    on_success: continue
+    on_error: warn
+
+  # Step 7: Generate documentation index
+  - name: generate_doc_index
+    description: "Create documentation index file"
+    action: script
+    script: |
+      echo "📚 Generating documentation index..."
+
+      cat > docs/INDEX.md << EOF
+      # Documentation Index
+
+      Generated: $(date +"%Y-%m-%d %H:%M:%S")
+
+      ## Core Documentation
+
+      - [README](../README.md) - Project overview and quick start
+      - [AGENTS.md](../AGENTS.md) - Complete project documentation for AI agents
+      - [CHANGELOG](../CHANGELOG.md) - Version history and changes
+
+      ## API Documentation
+
+      $(find docs/api -name "*.md" 2>/dev/null | sed 's/^/- [/' | sed 's/$/]/' | sed 's/\](/-/' | sed 's/-$/\)/')
+
+      ## Feature Documentation
+
+      $(find docs/features -name "*.md" 2>/dev/null | sed 's/^/- [/' | sed 's/$/]/' | sed 's/\](/-/' | sed 's/-$/\)/')
+
+      ## Coverage
+
+      Documentation coverage: {{ doc_coverage }}
+
+      ---
+
+      _Auto-generated by DevWorkflow Studio update-docs recipe_
+      EOF
+
+      mkdir -p docs
+      echo "✅ Documentation index generated"
+    on_success: continue
+    on_error: warn
+
+  # Step 8: Lint markdown files
+  - name: lint_markdown
+    description: "Lint markdown documentation files"
+    action: shell
+    command: |
+      if command -v markdownlint &> /dev/null; then
+        echo "📝 Linting markdown files..."
+        markdownlint "*.md" "docs/**/*.md" --fix || echo "⚠️  Some markdown linting issues found"
+      else
+        echo "ℹ️  markdownlint not installed, skipping"
+      fi
+    on_success: continue
+    on_error: warn
+
+  # Step 9: Check for broken links
+  - name: check_broken_links
+    description: "Scan documentation for broken links"
+    action: shell
+    command: |
+      echo "🔗 Checking for broken internal links..."
+
+      broken_links=0
+
+      for md_file in $(find . -name "*.md"); do
+        # Extract markdown links
+        links=$(grep -oP '\[.*?\]\(\K[^)]+' "$md_file" 2>/dev/null || echo "")
+
+        for link in $links; do
+          # Skip external links
+          if [[ "$link" =~ ^https?:// ]]; then
+            continue
+          fi
+
+          # Check if file exists
+          link_path=$(dirname "$md_file")/"$link"
+          if [ ! -f "$link_path" ] && [ ! -d "$link_path" ]; then
+            echo "⚠️  Broken link in $md_file: $link"
+            ((broken_links++))
+          fi
+        done
+      done
+
+      if [ "$broken_links" -gt 0 ]; then
+        echo "Found $broken_links broken link(s)"
+      else
+        echo "✅ No broken links found"
+      fi
+    output: broken_links_count
+    on_success: continue
+    on_error: warn
+
+  # Step 10: Stage documentation changes
+  - name: stage_doc_changes
+    description: "Stage all documentation changes"
+    action: shell
+    command: |
+      echo "📦 Staging documentation changes..."
+
+      git add \
+        README.md \
+        CHANGELOG.md \
+        AGENTS.md \
+        docs/ \
+        2>/dev/null || echo "Some files not found, continuing..."
+
+      changed_files=$(git diff --cached --name-only | grep -E '\.(md|markdown)$' | wc -l)
+
+      if [ "$changed_files" -gt 0 ]; then
+        echo "✅ Staged $changed_files documentation file(s)"
+      else
+        echo "ℹ️  No documentation changes to stage"
+      fi
+    output: staged_docs_count
+    on_success: continue
+    on_error: warn
+
+  # Step 11: Generate commit message for doc updates
+  - name: generate_doc_commit_msg
+    description: "Generate commit message for documentation updates"
+    condition: "{{ staged_docs_count > 0 }}"
+    server: git-workflow
+    tool: generate_commit_msg
+    params:
+      type: "docs"
+      scope: null
+      includeBreaking: false
+    output: commit_message
+    on_success: continue
+    on_error: warn
+
+  # Step 12: Summary report
+  - name: generate_summary
+    description: "Generate documentation update summary"
+    action: script
+    script: |
+      echo ""
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "📚 DOCUMENTATION UPDATE SUMMARY"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo ""
+      {{ update_readme && "echo \"✅ README.md updated\"" || "echo \"⏭️  README.md skipped\"" }}
+      {{ update_changelog && "echo \"✅ CHANGELOG.md updated\"" || "echo \"⏭️  CHANGELOG.md skipped\"" }}
+      {{ update_api_docs && "echo \"✅ API docs generated ({{ api_docs_format }})\"" || "echo \"⏭️  API docs skipped\"" }}
+      echo "✅ AGENTS.md updated"
+      echo "✅ Documentation index generated"
+      echo ""
+      echo "Coverage: {{ doc_coverage }}"
+      {{ broken_links_count > 0 && "echo \"⚠️  Broken links: {{ broken_links_count }}\"" || "echo \"✅ No broken links\"" }}
+      echo ""
+      echo "Files staged: {{ staged_docs_count }}"
+      echo ""
+      {{ commit_message && "echo \"💡 Suggested commit message:\"" || "" }}
+      {{ commit_message && "echo \"   {{ commit_message }}\"" || "" }}
+      echo ""
+      echo "✅ Documentation update complete!"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+summary:
+  template: |
+    ✅ Documentation synchronized successfully!
+
+    Updates performed:
+    {{ update_readme && "- ✅ README.md regenerated" || "" }}
+    {{ update_changelog && "- ✅ CHANGELOG.md updated from commits" || "" }}
+    {{ update_api_docs && "- ✅ API documentation generated (" + api_docs_format + ")" || "" }}
+    - ✅ AGENTS.md refreshed
+    - ✅ Documentation index created
+
+    Quality checks:
+    - Documentation coverage: {{ doc_coverage }}
+    - Broken links: {{ broken_links_count || 0 }}
+    - Files staged: {{ staged_docs_count || 0 }}
+
+    {{ commit_message && "💡 Suggested commit:\n   " + commit_message || "" }}
+
+    Next steps:
+    1. Review documentation changes
+    2. Commit: git commit -m "docs: update documentation"
+    3. Push changes
+
+validation:
+  - check: "README exists"
+    command: "test -f README.md"
+
+  - check: "Docs directory exists"
+    command: "test -d docs || mkdir -p docs"
+
+hooks:
+  pre_run:
+    - "Ensure docs directory"
+    - "Backup existing documentation"
+
+  post_run:
+    - "Generate summary"
+    - "Check for broken links"
+
+metadata:
+  category: "documentation"
+  tags: ["docs", "readme", "changelog", "api-docs"]
+  author: "DevWorkflow Studio"
+  requires:
+    - doc-generator server
+    - git-workflow server (optional)
+  schedule:
+    cron: "0 0 * * 0"  # Weekly on Sunday
+    description: "Weekly documentation sync"

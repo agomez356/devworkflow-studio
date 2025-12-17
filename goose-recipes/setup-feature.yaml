@@ -1,0 +1,415 @@
+# setup-feature.yaml
+# Goose Recipe: Automated feature scaffolding and setup
+# Creates branch, directory structure, boilerplate code, and initial documentation
+
+name: setup-feature
+description: "Scaffold a new feature with branch, directories, boilerplate code, and docs"
+version: "1.0.0"
+
+parameters:
+  - name: feature_name
+    description: "Name of the feature (e.g., 'user-authentication', 'data-export')"
+    required: true
+    type: string
+
+  - name: feature_type
+    description: "Type of feature: frontend, backend, or fullstack"
+    required: true
+    type: string
+    enum: ["frontend", "backend", "fullstack"]
+
+  - name: include_tests
+    description: "Generate test file templates"
+    required: false
+    type: boolean
+    default: true
+
+  - name: include_docs
+    description: "Generate feature documentation"
+    required: false
+    type: boolean
+    default: true
+
+steps:
+  # Step 1: Create feature branch
+  - name: create_feature_branch
+    description: "Create a Git branch for the feature"
+    server: git-workflow
+    tool: create_branch
+    params:
+      type: "feature"
+      name: "{{ feature_name }}"
+      from: "main"
+    on_success: continue
+    on_error: fail
+
+  # Step 2: Determine directory structure based on feature type
+  - name: plan_structure
+    description: "Plan directory structure based on feature type"
+    action: script
+    script: |
+      case "{{ feature_type }}" in
+        frontend)
+          echo "src/components/{{ feature_name }}"
+          echo "src/hooks/{{ feature_name }}"
+          echo "src/styles/{{ feature_name }}"
+          ;;
+        backend)
+          echo "src/routes/{{ feature_name }}"
+          echo "src/controllers/{{ feature_name }}"
+          echo "src/services/{{ feature_name }}"
+          echo "src/models/{{ feature_name }}"
+          ;;
+        fullstack)
+          echo "src/components/{{ feature_name }}"
+          echo "src/routes/{{ feature_name }}"
+          echo "src/controllers/{{ feature_name }}"
+          echo "src/services/{{ feature_name }}"
+          ;;
+      esac
+    output: directories
+
+  # Step 3: Create directory structure
+  - name: create_directories
+    description: "Create feature directories"
+    action: shell
+    command: |
+      for dir in {{ directories }}; do
+        mkdir -p "$dir"
+        echo "Created directory: $dir"
+      done
+    on_success: continue
+    on_error: warn
+
+  # Step 4: Generate boilerplate code
+  - name: generate_boilerplate
+    description: "Generate boilerplate files based on feature type"
+    action: script
+    script: |
+      FEATURE="{{ feature_name }}"
+      TYPE="{{ feature_type }}"
+
+      # Convert feature name to PascalCase for class names
+      PASCAL_CASE=$(echo "$FEATURE" | sed -r 's/(^|-)([a-z])/\U\2/g')
+
+      if [[ "$TYPE" == "frontend" ]] || [[ "$TYPE" == "fullstack" ]]; then
+        # Generate React component
+        cat > "src/components/${FEATURE}/${PASCAL_CASE}.tsx" << EOF
+      import React from 'react';
+      import './${PASCAL_CASE}.css';
+
+      interface ${PASCAL_CASE}Props {
+        // Add props here
+      }
+
+      export function ${PASCAL_CASE}(props: ${PASCAL_CASE}Props) {
+        return (
+          <div className="${FEATURE}">
+            <h2>${PASCAL_CASE}</h2>
+            {/* TODO: Implement component logic */}
+          </div>
+        );
+      }
+      EOF
+
+        # Generate CSS
+        cat > "src/components/${FEATURE}/${PASCAL_CASE}.css" << EOF
+      .${FEATURE} {
+        /* TODO: Add styles */
+      }
+      EOF
+
+        # Generate custom hook (if frontend)
+        if [[ "$TYPE" == "frontend" ]]; then
+          cat > "src/hooks/${FEATURE}/use${PASCAL_CASE}.ts" << EOF
+      import { useState, useEffect } from 'react';
+
+      export function use${PASCAL_CASE}() {
+        const [state, setState] = useState(null);
+
+        useEffect(() => {
+          // TODO: Implement hook logic
+        }, []);
+
+        return { state, setState };
+      }
+      EOF
+        fi
+      fi
+
+      if [[ "$TYPE" == "backend" ]] || [[ "$TYPE" == "fullstack" ]]; then
+        # Generate controller
+        cat > "src/controllers/${FEATURE}/${PASCAL_CASE}Controller.ts" << EOF
+      import { Request, Response, NextFunction } from 'express';
+
+      export class ${PASCAL_CASE}Controller {
+        async getAll(req: Request, res: Response, next: NextFunction): Promise<void> {
+          try {
+            // TODO: Implement getAll logic
+            res.json({ success: true, data: [] });
+          } catch (error) {
+            next(error);
+          }
+        }
+
+        async getById(req: Request, res: Response, next: NextFunction): Promise<void> {
+          try {
+            // TODO: Implement getById logic
+            res.json({ success: true, data: {} });
+          } catch (error) {
+            next(error);
+          }
+        }
+
+        async create(req: Request, res: Response, next: NextFunction): Promise<void> {
+          try {
+            // TODO: Implement create logic
+            res.status(201).json({ success: true, data: {} });
+          } catch (error) {
+            next(error);
+          }
+        }
+      }
+      EOF
+
+        # Generate routes
+        cat > "src/routes/${FEATURE}/${FEATURE}.ts" << EOF
+      import { Router } from 'express';
+      import { ${PASCAL_CASE}Controller } from '../controllers/${FEATURE}/${PASCAL_CASE}Controller';
+
+      const router = Router();
+      const controller = new ${PASCAL_CASE}Controller();
+
+      router.get('/', controller.getAll);
+      router.get('/:id', controller.getById);
+      router.post('/', controller.create);
+
+      export { router as ${FEATURE}Routes };
+      EOF
+
+        # Generate service
+        cat > "src/services/${FEATURE}/${PASCAL_CASE}Service.ts" << EOF
+      export class ${PASCAL_CASE}Service {
+        async findAll() {
+          // TODO: Implement database query
+          return [];
+        }
+
+        async findById(id: string) {
+          // TODO: Implement database query
+          return null;
+        }
+
+        async create(data: any) {
+          // TODO: Implement database insert
+          return data;
+        }
+      }
+      EOF
+
+        # Generate model
+        cat > "src/models/${FEATURE}/${PASCAL_CASE}.ts" << EOF
+      export interface ${PASCAL_CASE} {
+        id: string;
+        // TODO: Add model fields
+        createdAt: Date;
+        updatedAt?: Date;
+      }
+      EOF
+      fi
+    on_success: continue
+    on_error: warn
+
+  # Step 5: Generate test files
+  - name: generate_tests
+    description: "Generate test file templates"
+    condition: "{{ include_tests }}"
+    action: script
+    script: |
+      FEATURE="{{ feature_name }}"
+      TYPE="{{ feature_type }}"
+      PASCAL_CASE=$(echo "$FEATURE" | sed -r 's/(^|-)([a-z])/\U\2/g')
+
+      if [[ "$TYPE" == "frontend" ]] || [[ "$TYPE" == "fullstack" ]]; then
+        cat > "src/components/${FEATURE}/${PASCAL_CASE}.test.tsx" << EOF
+      import { render, screen } from '@testing-library/react';
+      import { ${PASCAL_CASE} } from './${PASCAL_CASE}';
+
+      describe('${PASCAL_CASE}', () => {
+        it('renders successfully', () => {
+          render(<${PASCAL_CASE} />);
+          // TODO: Add test assertions
+        });
+      });
+      EOF
+      fi
+
+      if [[ "$TYPE" == "backend" ]] || [[ "$TYPE" == "fullstack" ]]; then
+        cat > "src/controllers/${FEATURE}/${PASCAL_CASE}Controller.test.ts" << EOF
+      import { ${PASCAL_CASE}Controller } from './${PASCAL_CASE}Controller';
+
+      describe('${PASCAL_CASE}Controller', () => {
+        let controller: ${PASCAL_CASE}Controller;
+
+        beforeEach(() => {
+          controller = new ${PASCAL_CASE}Controller();
+        });
+
+        it('should get all items', async () => {
+          // TODO: Implement test
+        });
+      });
+      EOF
+      fi
+    on_success: continue
+    on_error: warn
+
+  # Step 6: Generate feature documentation
+  - name: generate_docs
+    description: "Generate feature documentation file"
+    condition: "{{ include_docs }}"
+    action: script
+    script: |
+      FEATURE="{{ feature_name }}"
+      TYPE="{{ feature_type }}"
+
+      cat > "docs/features/${FEATURE}.md" << EOF
+      # ${FEATURE} Feature
+
+      ## Overview
+
+      **Type**: ${TYPE}
+      **Status**: 🚧 In Development
+      **Created**: $(date +%Y-%m-%d)
+
+      ## Description
+
+      TODO: Describe the feature purpose and functionality
+
+      ## Implementation
+
+      ### Files Created
+
+      - [ ] Component/Controller files
+      - [ ] Service layer
+      - [ ] Models/Types
+      - [ ] Tests
+      - [ ] Styles (if frontend)
+
+      ### Dependencies
+
+      TODO: List any new dependencies needed
+
+      ## Testing
+
+      TODO: Describe testing strategy
+
+      ## Deployment Notes
+
+      TODO: Add any deployment considerations
+      EOF
+
+      mkdir -p docs/features
+    on_success: continue
+    on_error: warn
+
+  # Step 7: Lint generated code
+  - name: lint_code
+    description: "Lint the generated code"
+    server: code-quality
+    tool: lint_code
+    params:
+      path: "src"
+      linter: "auto"
+      fix: true
+    on_success: continue
+    on_error: warn
+
+  # Step 8: Format generated code
+  - name: format_code
+    description: "Format the generated code"
+    server: code-quality
+    tool: format_code
+    params:
+      path: "src"
+      formatter: "auto"
+      write: true
+    on_success: continue
+    on_error: warn
+
+  # Step 9: Update changelog
+  - name: update_changelog
+    description: "Add feature to changelog"
+    server: doc-generator
+    tool: update_changelog
+    params:
+      version: "unreleased"
+      changes:
+        - type: "Added"
+          description: "Scaffolded {{ feature_name }} feature ({{ feature_type }})"
+    on_success: continue
+    on_error: warn
+
+  # Step 10: Create initial commit
+  - name: initial_commit
+    description: "Create initial commit for feature scaffold"
+    action: shell
+    command: |
+      git add .
+      git commit -m "feat({{ feature_name }}): scaffold {{ feature_type }} feature
+
+      Generated boilerplate for {{ feature_name }} feature:
+      - Directory structure
+      - Boilerplate code ({{ feature_type }})
+      {{ include_tests == true && "- Test files" || "" }}
+      {{ include_docs == true && "- Feature documentation" || "" }}
+
+      🤖 Generated with DevWorkflow Studio setup-feature recipe"
+    on_success: continue
+    on_error: warn
+
+summary:
+  template: |
+    ✅ Feature Setup Complete!
+
+    Feature: {{ feature_name }}
+    Type: {{ feature_type }}
+    Branch: feature/{{ feature_name }}
+
+    Generated:
+    - Directory structure
+    - Boilerplate code
+    {{ include_tests == true && "- Test templates" || "" }}
+    {{ include_docs == true && "- Feature documentation" || "" }}
+
+    Next steps:
+    1. Review generated code
+    2. Implement TODOs
+    3. Write tests
+    4. Update documentation
+    5. Commit changes
+
+validation:
+  - check: "Git branch created"
+    command: "git branch | grep -q 'feature/{{ feature_name }}'"
+
+  - check: "Directories exist"
+    command: "test -d src"
+
+  - check: "Files generated"
+    command: "find src -type f | grep -q '{{ feature_name }}'"
+
+rollback:
+  on_failure:
+    - "Delete generated files"
+    - "Switch back to original branch"
+    - "Delete feature branch"
+
+metadata:
+  category: "scaffolding"
+  tags: ["feature", "boilerplate", "automation"]
+  author: "DevWorkflow Studio"
+  requires:
+    - git-workflow server
+    - code-quality server
+    - doc-generator server

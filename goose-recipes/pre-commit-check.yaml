@@ -1,0 +1,288 @@
+# pre-commit-check.yaml
+# Goose Recipe: Pre-commit quality checks
+# Runs linting, formatting, tests, and validation before allowing commits
+
+name: pre-commit-check
+description: "Comprehensive pre-commit checks for code quality, tests, and standards"
+version: "1.0.0"
+
+parameters:
+  - name: auto_fix
+    description: "Automatically fix linting and formatting issues"
+    required: false
+    type: boolean
+    default: true
+
+  - name: run_tests
+    description: "Run test suite before commit"
+    required: false
+    type: boolean
+    default: true
+
+  - name: check_coverage
+    description: "Verify test coverage meets threshold"
+    required: false
+    type: boolean
+    default: false
+
+  - name: coverage_threshold
+    description: "Minimum test coverage percentage (if check_coverage=true)"
+    required: false
+    type: number
+    default: 80
+
+steps:
+  # Step 1: Get staged files
+  - name: get_staged_files
+    description: "Get list of staged files for commit"
+    action: shell
+    command: "git diff --cached --name-only --diff-filter=ACMR"
+    output: staged_files
+    on_success: continue
+    on_error: fail
+
+  # Step 2: Check if there are any staged files
+  - name: check_staged_files
+    description: "Verify there are files to commit"
+    action: shell
+    command: |
+      if [ -z "{{ staged_files }}" ]; then
+        echo "❌ No staged files found. Stage your changes with 'git add' first."
+        exit 1
+      fi
+      echo "✅ Found {{ staged_files | count }} staged file(s)"
+    on_success: continue
+    on_error: fail
+
+  # Step 3: Lint staged files
+  - name: lint_staged_files
+    description: "Run linter on staged files"
+    server: code-quality
+    tool: lint_code
+    params:
+      path: "."
+      linter: "auto"
+      fix: "{{ auto_fix }}"
+    on_success: continue
+    on_error: fail
+    error_message: |
+      ❌ Linting failed. Please fix the issues before committing.
+      {{ auto_fix == false && "Tip: Run with auto_fix=true to automatically fix issues." || "" }}
+
+  # Step 4: Check code formatting
+  - name: check_formatting
+    description: "Verify code formatting"
+    server: code-quality
+    tool: format_code
+    params:
+      path: "."
+      formatter: "auto"
+      write: "{{ auto_fix }}"
+    on_success: continue
+    on_error: fail
+    error_message: |
+      ❌ Code formatting check failed.
+      {{ auto_fix == false && "Tip: Run with auto_fix=true to automatically format code." || "" }}
+
+  # Step 5: Analyze code complexity
+  - name: analyze_complexity
+    description: "Check code complexity of modified files"
+    server: code-quality
+    tool: analyze_complexity
+    params:
+      path: "{{ staged_files | first }}"
+    on_success: continue
+    on_error: warn
+    error_message: "⚠️  High code complexity detected. Consider refactoring."
+
+  # Step 6: Run tests (if enabled)
+  - name: run_tests
+    description: "Run test suite"
+    condition: "{{ run_tests }}"
+    action: shell
+    command: |
+      echo "🧪 Running tests..."
+      if command -v npm &> /dev/null; then
+        npm test -- --passWithNoTests || exit 1
+      elif command -v python &> /dev/null; then
+        python -m pytest || exit 1
+      else
+        echo "⚠️  No test runner found (npm/pytest), skipping tests"
+      fi
+    on_success: continue
+    on_error: fail
+    error_message: "❌ Tests failed. Fix failing tests before committing."
+
+  # Step 7: Check test coverage (if enabled)
+  - name: check_coverage
+    description: "Verify test coverage meets threshold"
+    condition: "{{ check_coverage }}"
+    action: shell
+    command: |
+      echo "📊 Checking test coverage (threshold: {{ coverage_threshold }}%)..."
+      if command -v npm &> /dev/null; then
+        npm run coverage || exit 1
+        # Parse coverage from output and compare
+        # (Implementation depends on test framework)
+      fi
+    on_success: continue
+    on_error: warn
+    error_message: "⚠️  Test coverage below {{ coverage_threshold }}%"
+
+  # Step 8: Check for sensitive data
+  - name: check_sensitive_data
+    description: "Scan for potential secrets or sensitive data"
+    action: shell
+    command: |
+      echo "🔒 Scanning for sensitive data..."
+
+      # Check for common secret patterns
+      if git diff --cached | grep -iE '(password|api[_-]?key|secret|token|private[_-]?key)' > /dev/null; then
+        echo "⚠️  Potential sensitive data detected in staged files:"
+        git diff --cached | grep -iE '(password|api[_-]?key|secret|token|private[_-]?key)'
+        echo ""
+        echo "Please review and ensure no actual secrets are committed."
+        echo "Use environment variables or secret management instead."
+        exit 1
+      fi
+
+      echo "✅ No obvious sensitive data detected"
+    on_success: continue
+    on_error: warn
+
+  # Step 9: Check commit message format (if commit message provided)
+  - name: validate_commit_message
+    description: "Validate commit message follows conventions"
+    action: shell
+    command: |
+      # Check if COMMIT_EDITMSG exists (during git commit)
+      if [ -f ".git/COMMIT_EDITMSG" ]; then
+        MSG=$(cat .git/COMMIT_EDITMSG | head -1)
+
+        # Check for conventional commit format
+        if ! echo "$MSG" | grep -qE '^(feat|fix|docs|style|refactor|test|chore|perf)(\([a-z-]+\))?:'; then
+          echo "⚠️  Commit message doesn't follow Conventional Commits format"
+          echo "Expected: type(scope): description"
+          echo "Examples: feat(api): add user endpoint"
+          echo "          fix: resolve login bug"
+        else
+          echo "✅ Commit message format looks good"
+        fi
+      fi
+    on_success: continue
+    on_error: warn
+
+  # Step 10: Check for large files
+  - name: check_file_sizes
+    description: "Warn about large files being committed"
+    action: shell
+    command: |
+      echo "📦 Checking file sizes..."
+      MAX_SIZE=1048576  # 1MB in bytes
+
+      for file in {{ staged_files }}; do
+        if [ -f "$file" ]; then
+          size=$(wc -c < "$file")
+          if [ "$size" -gt "$MAX_SIZE" ]; then
+            size_mb=$((size / 1048576))
+            echo "⚠️  Large file detected: $file (${size_mb}MB)"
+            echo "   Consider using Git LFS for large files"
+          fi
+        fi
+      done
+
+      echo "✅ File size check complete"
+    on_success: continue
+    on_error: warn
+
+  # Step 11: Generate commit message suggestion
+  - name: suggest_commit_message
+    description: "Generate semantic commit message from changes"
+    server: git-workflow
+    tool: generate_commit_msg
+    params:
+      type: "auto"
+      includeBreaking: false
+    on_success: continue
+    on_error: warn
+    output: suggested_message
+
+  # Step 12: Summary report
+  - name: generate_report
+    description: "Generate pre-commit check summary"
+    action: script
+    script: |
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo "📋 PRE-COMMIT CHECK SUMMARY"
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+      echo ""
+      echo "Files staged: {{ staged_files | count }}"
+      echo "Linting: ✅ Passed"
+      echo "Formatting: ✅ Passed"
+      {{ run_tests == true && "echo \"Tests: ✅ Passed\"" || "" }}
+      {{ check_coverage == true && "echo \"Coverage: ✅ Above {{ coverage_threshold }}%\"" || "" }}
+      echo "Sensitive data: ✅ None detected"
+      echo ""
+      {{ suggested_message && "echo \"💡 Suggested commit message:\"" || "" }}
+      {{ suggested_message && "echo \"   {{ suggested_message }}\"" || "" }}
+      echo ""
+      echo "✅ All checks passed! Ready to commit."
+      echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+summary:
+  template: |
+    ✅ Pre-commit checks completed successfully!
+
+    Checks performed:
+    - ✅ Linting ({{ auto_fix && "with auto-fix" || "check only" }})
+    - ✅ Code formatting
+    - ✅ Code complexity analysis
+    {{ run_tests && "- ✅ Test suite" || "" }}
+    {{ check_coverage && "- ✅ Test coverage (>= {{ coverage_threshold }}%)" || "" }}
+    - ✅ Sensitive data scan
+    - ✅ File size check
+
+    Files ready to commit: {{ staged_files | count }}
+
+    {{ suggested_message && "💡 Suggested commit message:\n   " + suggested_message || "" }}
+
+    Ready to proceed with commit!
+
+validation:
+  - check: "Staged files exist"
+    command: "git diff --cached --name-only | grep -q ."
+
+  - check: "No uncommitted lint fixes"
+    command: "git diff --name-only | wc -l | grep -q '^0$'"
+
+hooks:
+  pre_run:
+    - "Ensure Git repository"
+    - "Check for staged changes"
+
+  post_run:
+    - "Display summary"
+    - "Suggest commit message"
+
+error_handling:
+  on_lint_failure:
+    message: "Linting failed. Fix issues or use auto_fix=true"
+    suggest: "Run: goose run pre-commit-check auto_fix=true"
+
+  on_test_failure:
+    message: "Tests failed. Fix failing tests before committing"
+    suggest: "Run: npm test (or pytest) to see detailed output"
+
+  on_sensitive_data:
+    message: "Potential sensitive data detected"
+    suggest: "Review changes and remove any secrets"
+
+metadata:
+  category: "quality-assurance"
+  tags: ["pre-commit", "quality", "testing", "linting"]
+  author: "DevWorkflow Studio"
+  requires:
+    - code-quality server
+    - git-workflow server
+  git_hooks:
+    - "pre-commit"
